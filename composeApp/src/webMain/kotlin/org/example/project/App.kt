@@ -72,6 +72,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -337,6 +338,21 @@ fun ScrollAnimatedContent(
 
 @Composable
 fun App() {
+    val routing = remember { createWebRouting() }
+    
+    // Routing state based on URL hash
+    var currentRoute by remember { mutableStateOf(routing.getCurrentRoute()) }
+    
+    // Listen to hash changes
+    DisposableEffect(Unit) {
+        val cleanup = routing.onRouteChange { route ->
+            currentRoute = route
+        }
+        onDispose {
+            cleanup()
+        }
+    }
+
     MaterialTheme(
         colorScheme = darkColorScheme(
             primary = BlueAccent,
@@ -355,73 +371,80 @@ fun App() {
                 fontFamily = FontFamily.Default
             )
         ) {
-            val scrollState = rememberScrollState()
-            // Store section positions for smooth scrolling
-            val sectionPositions = remember { mutableStateMapOf<String, Int>() }
-            // Track cumulative Y position as we go through sections
-            var currentY by remember { mutableStateOf(0) }
+            when (currentRoute) {
+                "about" -> {
+                    AboutUsPage()
+                }
+                else -> {
+                    val scrollState = rememberScrollState()
+                    // Store section positions for smooth scrolling
+                    val sectionPositions = remember { mutableStateMapOf<String, Int>() }
+                    // Track cumulative Y position as we go through sections
+                    var currentY by remember { mutableStateOf(0) }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFF0A0A0F),
-                                Color(0xFF0D0F18),
-                                Color(0xFF1A1F2F),
-                                Color(0xFF0D0F18),
-                                Color(0xFF0A0A0F)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF0A0A0F),
+                                        Color(0xFF0D0F18),
+                                        Color(0xFF1A1F2F),
+                                        Color(0xFF0D0F18),
+                                        Color(0xFF0A0A0F)
+                                    )
+                                )
                             )
-                        )
-                    )
-            ) {
-                BoxWithConstraints(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    val responsiveConfig = rememberResponsiveConfig(maxWidth)
-
-                    CompositionLocalProvider(LocalResponsiveConfig provides responsiveConfig) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(scrollState)
+                    ) {
+                        BoxWithConstraints(
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 100) {
-                                HeroSectionWithHeader(scrollState, sectionPositions, currentY) { currentY += it }
-                            }
+                            val responsiveConfig = rememberResponsiveConfig(maxWidth)
 
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
-                                PartnerLogosSection { currentY += it }
+                            CompositionLocalProvider(LocalResponsiveConfig provides responsiveConfig) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(scrollState)
+                                ) {
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 100) {
+                                        HeroSectionWithHeader(scrollState, sectionPositions, currentY) { currentY += it }
+                                    }
+
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
+                                        PartnerLogosSection { currentY += it }
+                                    }
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
+                                        ProgramHighlightsSection { currentY += it }
+                                    }
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 100) {
+                                        CourseVideoSection { currentY += it }
+                                    }
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
+                                        WhyChooseSection(scrollState, sectionPositions) { currentY += it }
+                                    }
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 100) {
+                                        CurriculumSection(sectionPositions)
+                                    }
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
+                                        TestimonialsSection(sectionPositions)
+                                    }
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 100) {
+                                        MeetMentorSection(sectionPositions)
+                                    }
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
+                                        PricingSection(sectionPositions)
+                                    }
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 100) {
+                                        FAQSection(sectionPositions)
+                                    }
+                                    ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
+                                        FinalCTASection()
+                                    }
+                                    Footer()
+                                }
                             }
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
-                                ProgramHighlightsSection { currentY += it }
-                            }
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 100) {
-                                CourseVideoSection { currentY += it }
-                            }
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
-                                WhyChooseSection(scrollState, sectionPositions) { currentY += it }
-                            }
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 100) {
-                                CurriculumSection(sectionPositions)
-                            }
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
-                                TestimonialsSection(sectionPositions)
-                            }
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 100) {
-                                MeetMentorSection(sectionPositions)
-                            }
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
-                                PricingSection(sectionPositions)
-                            }
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 100) {
-                                FAQSection(sectionPositions)
-                            }
-                            ScrollAnimatedContent(scrollState = scrollState, animationDelay = 0) {
-                                FinalCTASection()
-                            }
-                            Footer()
                         }
                     }
                 }
@@ -2821,9 +2844,21 @@ private fun FooterBrand() {
 
 @Composable
 private fun FooterLinks() {
+    val routing = remember { createWebRouting() }
     val links = listOf("About","Workshops", "Contact Us")
     links.forEach { label ->
-        TextButton(onClick = {}) {
+        TextButton(
+            onClick = {
+                when (label) {
+                    "About" -> {
+                        routing.navigateTo("about")
+                    }
+                    else -> {
+                        // Handle other links if needed
+                    }
+                }
+            }
+        ) {
             Text(label, color = TextGray, fontSize = 15.sp)
         }
     }
