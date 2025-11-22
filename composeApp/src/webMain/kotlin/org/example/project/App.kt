@@ -176,6 +176,10 @@ val LocalResponsiveConfig = staticCompositionLocalOf {
     )
 }
 
+val LocalWebRouting = staticCompositionLocalOf<WebRouting> {
+    error("WebRouting not provided")
+}
+
 @Composable
 fun rememberResponsiveConfig(maxWidth: Dp): ResponsiveLayoutConfig {
     return remember(maxWidth) {
@@ -343,8 +347,12 @@ fun App() {
     // Routing state based on URL hash
     var currentRoute by remember { mutableStateOf(routing.getCurrentRoute()) }
     
-    // Listen to hash changes
-    DisposableEffect(Unit) {
+    // Listen to hash changes and update route
+    DisposableEffect(routing) {
+        // Get initial route
+        currentRoute = routing.getCurrentRoute()
+        
+        // Set up listener for route changes
         val cleanup = routing.onRouteChange { route ->
             currentRoute = route
         }
@@ -369,11 +377,18 @@ fun App() {
         CompositionLocalProvider(
             LocalTextStyle provides TextStyle(
                 fontFamily = FontFamily.Default
-            )
+            ),
+            LocalWebRouting provides routing
         ) {
             when (currentRoute) {
                 "about" -> {
                     AboutUsPage()
+                }
+                "workshops" -> {
+                    PreviousWorkshopsPage()
+                }
+                "contact" -> {
+                    ContactUsPage()
                 }
                 else -> {
                     val scrollState = rememberScrollState()
@@ -462,7 +477,8 @@ fun HeroSectionWithHeader(
 ) {
     val responsive = LocalResponsiveConfig.current
     val isMobile = responsive.isMobile
-    val navigationItems = listOf("Mentors", "Curriculum", "Reviews", "Pricing")
+    val routing = LocalWebRouting.current
+    val navigationItems = listOf("About Us", "Workshops", "Curriculum", "Reviews")
     val coroutineScope = rememberCoroutineScope()
 
     // Function to scroll to a section
@@ -477,6 +493,16 @@ fun HeroSectionWithHeader(
                     animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
                 )
             }
+        }
+    }
+
+    // Function to handle navigation item clicks
+    val handleNavigationClick: (String) -> Unit = { item ->
+        when (item) {
+            "About Us" -> routing.navigateTo("about")
+            "Workshops" -> routing.navigateTo("workshops")
+            "Curriculum" -> scrollToSection("Curriculum")
+            "Reviews" -> scrollToSection("Reviews")
         }
     }
 
@@ -521,7 +547,7 @@ fun HeroSectionWithHeader(
                     ) {
                         navigationItems.forEach { item ->
                             TextButton(
-                                onClick = { scrollToSection(item) },
+                                onClick = { handleNavigationClick(item) },
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Text(item, color = TextWhite, fontSize = 14.sp)
@@ -546,7 +572,7 @@ fun HeroSectionWithHeader(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         navigationItems.forEach { item ->
-                            TextButton(onClick = { scrollToSection(item) }) {
+                            TextButton(onClick = { handleNavigationClick(item) }) {
                                 Text(item, color = TextWhite, fontSize = 15.sp)
                             }
                         }
@@ -651,7 +677,7 @@ fun HeroSectionWithHeader(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                "Join the Cohourt",
+                                "Join the Cohort",
                                 color = TextWhite,
                                 fontSize = responsive.bodyTextSize,
                                 fontWeight = FontWeight.Medium
@@ -691,7 +717,7 @@ fun HeroSectionWithHeader(
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text(
-                                "Join the Workshop",
+                                "Join the Cohort",
                                 color = TextWhite,
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Medium,
@@ -2844,14 +2870,20 @@ private fun FooterBrand() {
 
 @Composable
 private fun FooterLinks() {
-    val routing = remember { createWebRouting() }
-    val links = listOf("About","Workshops", "Contact Us")
+    val routing = LocalWebRouting.current
+    val links = listOf("About Us","Workshops", "Contact Us")
     links.forEach { label ->
         TextButton(
             onClick = {
                 when (label) {
-                    "About" -> {
+                    "About Us" -> {
                         routing.navigateTo("about")
+                    }
+                    "Workshops" -> {
+                        routing.navigateTo("workshops")
+                    }
+                    "Contact Us" -> {
+                        routing.navigateTo("contact")
                     }
                     else -> {
                         // Handle other links if needed
