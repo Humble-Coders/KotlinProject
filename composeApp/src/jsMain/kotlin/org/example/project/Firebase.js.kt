@@ -5,20 +5,27 @@ import kotlinx.browser.window
 import org.w3c.fetch.Response
 
 actual suspend fun submitToFirebase(fields: Map<String, String>, databaseUrl: String) {
+    println("=== Starting Firebase Submission ===")
+    println("URL: $databaseUrl")
+    
     // Get current timestamp
-    val timestamp = js("Date.now()").unsafeCast<Double>().toLong()
+    val timestamp = js("Date.now()").unsafeCast<Number>()
+    val submittedAt = js("new Date().toISOString()") as String
     
     // Build Firestore document structure
-    // Firestore REST API expects fields in a specific format with "stringValue", "integerValue", etc.
     val firestoreFields = buildString {
         append("{")
+        var isFirst = true
         fields.forEach { (key, value) ->
-            if (length > 1) append(",")
+            if (!isFirst) append(",")
             append("\"$key\": {\"stringValue\": \"${escapeJsonString(value)}\"}")
-            append("}")
+            isFirst = false
         }
         // Add timestamp as integerValue
-        append(",\"timestamp\": {\"integerValue\": \"$timestamp\"}")
+        if (!isFirst) append(",")
+        append("\"timestamp\": {\"integerValue\": \"$timestamp\"}")
+        // Add submittedAt as stringValue
+        append(",\"submittedAt\": {\"stringValue\": \"${escapeJsonString(submittedAt)}\"}")
         append("}")
     }
     
@@ -28,23 +35,41 @@ actual suspend fun submitToFirebase(fields: Map<String, String>, databaseUrl: St
     }
     """.trimIndent()
     
-    // Use Kotlin/JS Promise-based fetch API
+    println("Request body: $firestoreDocument")
+    
+    // Create fetch options
     val fetchOptions = js("{}")
     fetchOptions.method = "POST"
     fetchOptions.headers = js("{}")
     fetchOptions.headers["Content-Type"] = "application/json"
     fetchOptions.body = firestoreDocument
     
-    val response = window.fetch(databaseUrl, fetchOptions).await() as Response
-
-    val ok = response.status.toInt() in 200..299
-    if (!ok) {
-        val errorText = response.text().await()
-        throw Exception("Failed to submit form: ${response.status} ${response.statusText}. $errorText")
+    try {
+        println("Sending request...")
+        
+        val response = window.fetch(databaseUrl, fetchOptions).await() as Response
+        
+        println("Response received, status: ${response.status}")
+        
+        // Get response text
+        val responseText = response.text().await()
+        println("Response body: $responseText")
+        
+        val status = response.status.toInt()
+        
+        if (status !in 200..299) {
+            println("HTTP Error: $status $responseText")
+            throw Exception("Failed to submit: HTTP $status - $responseText")
+        }
+        
+        println("=== Submission Successful ===")
+        
+    } catch (e: Exception) {
+        println("=== Submission Failed ===")
+        println("Error message: ${e.message}")
+        println("Error: $e")
+        throw Exception("Network error: ${e.message ?: "Unknown error"}")
     }
-
-    val result = response.text().await()
-    println("Firestore response: $result")
 }
 
 // Helper function to escape JSON strings for Firestore
@@ -55,4 +80,5 @@ private fun escapeJsonString(str: String): String {
         .replace("\n", "\\n")
         .replace("\r", "\\r")
         .replace("\t", "\\t")
+        .replace("'", "\\'")
 }

@@ -40,9 +40,10 @@ import org.jetbrains.compose.resources.painterResource
 
 // Firebase Firestore configuration - Replace these with your actual Firebase project details
 private const val FIREBASE_PROJECT_ID = "humblecoders-abeb4" // Replace with your Firebase project ID
+private const val FIREBASE_API_KEY = "AIzaSyAmpz3j-QaEM4RhYAefD-_fxe6vxzm0Qz8" // Get this from Firebase Console → Project Settings → General → Web API Key
 private const val FIRESTORE_COLLECTION = "contacts" // Collection name in Firestore
-private const val FIRESTORE_DATABASE_URL = "https://firestore.googleapis.com/v1/projects/$FIREBASE_PROJECT_ID/databases/(default)/documents/$FIRESTORE_COLLECTION"
-// For production, use Firebase Authentication or Cloud Functions for security
+private const val FIRESTORE_DATABASE_URL = "https://firestore.googleapis.com/v1/projects/$FIREBASE_PROJECT_ID/databases/(default)/documents/$FIRESTORE_COLLECTION?key=$FIREBASE_API_KEY"
+// Note: Make sure to configure Firestore security rules to allow writes to the contacts collection
 
 // Helper function to escape JSON strings
 private fun escapeJsonString(str: String): String {
@@ -483,8 +484,17 @@ fun ContactForm(modifier: Modifier = Modifier) {
                                     formData = ContactFormData()
                                     errorMessage = null
                                 } catch (e: Exception) {
-                                    errorMessage = e.message ?: "Failed to submit form. Please check your Firebase configuration."
+                                    val errorMsg = e.message ?: "Failed to submit form. Please try again later."
+                                    errorMessage = if (errorMsg.contains("401") || errorMsg.contains("403")) {
+                                        "Authentication error. Please check Firebase configuration or contact support."
+                                    } else if (errorMsg.contains("Network") || errorMsg.contains("fetch")) {
+                                        "Network error. Please check your internet connection and try again."
+                                    } else {
+                                        errorMsg
+                                    }
                                     showSuccessMessage = false
+                                    println("Form submission error: $errorMsg")
+                                    e.printStackTrace()
                                 } finally {
                                     isSubmitting = false
                                 }
@@ -760,11 +770,20 @@ suspend fun submitContactForm(formData: ContactFormData) {
             "message" to formData.message
         )
         
+        println("Submitting form to: $FIRESTORE_DATABASE_URL")
+        println("Form data: $fields")
+        
         // Call platform-specific Firestore submission (timestamp will be added in platform code)
+        // NOTE: Firestore REST API requires authentication. For production, use:
+        // 1. Firebase Cloud Functions (recommended)
+        // 2. Firebase Authentication with proper security rules
+        // 3. Or configure Firestore security rules to allow public writes (not recommended)
         submitToFirebase(fields, FIRESTORE_DATABASE_URL)
         println("Form submitted successfully to Firestore")
     } catch (e: Exception) {
         println("Error submitting form: ${e.message}")
+        println("Error type: ${e::class.simpleName}")
+        e.printStackTrace()
         // Re-throw to allow UI to handle the error
         throw e
     }
