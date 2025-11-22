@@ -1,99 +1,95 @@
 package org.example.project
 
-import kotlin.js.ExperimentalWasmJsInterop
-import kotlinx.coroutines.await
-import kotlinx.browser.window
-import org.w3c.fetch.Headers
-import org.w3c.fetch.RequestInit
-import org.w3c.fetch.Response
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
-// Top-level property for Date.now() - required for Wasm JS interop
-@OptIn(ExperimentalWasmJsInterop::class)
-private val dateNowJs: Double = js("Date.now()")
-// Top-level function for Date.toISOString() - required for Wasm JS interop
-@OptIn(ExperimentalWasmJsInterop::class)
-private val dateToIsoStringFn: () -> String = js("() => new Date().toISOString()")
+// External declaration for XMLHttpRequest with proper Wasm-compatible types
+external class XMLHttpRequest {
+    var timeout: Int
+    var status: Short
+    var responseText: String
+    var onload: (() -> Unit)?
+    var onerror: (() -> Unit)?
+    var ontimeout: (() -> Unit)?
 
-@OptIn(ExperimentalWasmJsInterop::class)
+    fun open(method: String, url: String, async: Boolean)
+    fun setRequestHeader(header: String, value: String)
+    fun send(body: String?)
+}
+
+// Top-level functions for timestamp (required by Kotlin/Wasm)
+private fun getCurrentTimestamp(): String = js("Date.now().toString()")
+
+private fun getCurrentISOString(): String = js("new Date().toISOString()")
+
 actual suspend fun submitToFirebase(fields: Map<String, String>, databaseUrl: String) {
-    println("=== Starting Firebase Submission ===")
+    println("=== Starting Firebase Submission (XHR) ===")
     println("URL: $databaseUrl")
-    
-    // Get current timestamp
-    val timestamp = dateNowJs.toLong()
-    val submittedAt = dateToIsoStringFn()
-    
-    // Build Firestore document structure
-    // Firestore REST API expects fields in a specific format with "stringValue", "integerValue", etc.
-    val firestoreFields = buildString {
-        append("{")
-        var isFirst = true
-        fields.forEach { (key, value) ->
-            if (!isFirst) append(",")
-            append("\"$key\": {\"stringValue\": \"${escapeJsonString(value)}\"}")
-            isFirst = false
-        }
-        // Add timestamp as integerValue
-        if (!isFirst) append(",")
-        append("\"timestamp\": {\"integerValue\": \"$timestamp\"}")
-        // Add submittedAt as stringValue
-        append(",\"submittedAt\": {\"stringValue\": \"${escapeJsonString(submittedAt)}\"}")
-        append("}")
-    }
-    
-    val firestoreDocument = """
-    {
-        "fields": $firestoreFields
-    }
-    """.trimIndent()
-    
-    println("Request body: $firestoreDocument")
-    
-    // Create headers using Headers API for Kotlin/Wasm
-    val headers = Headers()
-    headers.append("Content-Type", "application/json")
-    
-    // For Wasm, create RequestInit with proper headers
-    val requestInit = RequestInit(
-        method = "POST",
-        headers = headers,
-        body = firestoreDocument as kotlin.js.JsAny?
-    )
-    
-    try {
-        println("Sending request...")
-        
-        val response = window.fetch(databaseUrl, requestInit).await<Response>()
 
-        println("Response received, status: ${response.status}")
-        
-        val status = response.status.toInt()
-        
-        // Get response text
-        val responseText = try {
-            response.text().await()
+    val timestamp = getCurrentTimestamp()
+    val now = getCurrentISOString()
+
+    // Build JSON string manually
+    val jsonBody = buildString {
+        append("""{"fields":{""")
+
+        fields.entries.forEachIndexed { index, (key, value) ->
+            if (index > 0) append(",")
+            append(""""$key":{"stringValue":"${escapeJsonString(value)}"}""")
+        }
+
+        append(""","timestamp":{"integerValue":"$timestamp"}""")
+        append(""","submittedAt":{"stringValue":"$now"}""")
+        append("}}")
+    }
+
+    println("Request body: $jsonBody")
+    println("Using XMLHttpRequest to send...")
+
+    return suspendCoroutine { continuation ->
+        try {
+            val xhr = XMLHttpRequest()
+            xhr.timeout = 15000
+
+            xhr.onload = {
+                println("XHR Response status: ${xhr.status}")
+                println("XHR Response text: ${xhr.responseText}")
+
+                if (xhr.status in 200..299) {
+                    println("=== Submission Successful ===")
+                    continuation.resume(Unit)
+                } else {
+                    println("HTTP Error: ${xhr.status} ${xhr.responseText}")
+                    continuation.resumeWithException(
+                        Exception("Failed to submit: HTTP ${xhr.status} - ${xhr.responseText}")
+                    )
+                }
+            }
+
+            xhr.onerror = {
+                println("=== Network Error ===")
+                continuation.resumeWithException(Exception("Network error occurred"))
+            }
+
+            xhr.ontimeout = {
+                println("=== Request Timeout ===")
+                continuation.resumeWithException(Exception("Request timeout after 15 seconds"))
+            }
+
+            xhr.open("POST", databaseUrl, true)
+            xhr.setRequestHeader("Content-Type", "application/json")
+            xhr.send(jsonBody)
+
+            println("XHR request sent!")
+
         } catch (e: Exception) {
-            "Unable to read response body"
+            println("Exception in XHR setup: ${e.message}")
+            continuation.resumeWithException(e)
         }
-        
-        println("Response body: $responseText")
-        
-        if (status !in 200..299) {
-            println("HTTP Error: $status $responseText")
-            throw Exception("Failed to submit: HTTP $status - $responseText")
-        }
-        
-        println("=== Submission Successful ===")
-        
-    } catch (e: Exception) {
-        println("=== Submission Failed ===")
-        println("Error message: ${e.message}")
-        println("Error: $e")
-        throw Exception("Network error: ${e.message ?: "Unknown error"}")
     }
 }
 
-// Helper function to escape JSON strings for Firestore
 private fun escapeJsonString(str: String): String {
     return str
         .replace("\\", "\\\\")

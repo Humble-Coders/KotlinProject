@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -128,6 +129,7 @@ fun ContactUsPage() {
 fun ContactUsHeader() {
     val responsive = LocalResponsiveConfig.current
     val isMobile = responsive.isMobile
+    val routing = LocalWebRouting.current
 
     Box(
         modifier = Modifier
@@ -161,14 +163,33 @@ fun ContactUsHeader() {
             verticalPaddingMultiplier = if (isMobile) 0.8f else 1.0f,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Image(
-                painter = painterResource(Res.drawable.humble),
-                contentDescription = "Humble Coders Logo",
-                modifier = Modifier.size(if (isMobile) 90.dp else 120.dp),
-                contentScale = ContentScale.Fit
-            )
+            // Back button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                IconButton(
+                    onClick = { routing.navigateTo("") },
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.1f))
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back to Home",
+                            tint = TextWhite,
+                            modifier = Modifier.size(20.dp)
+                        )
 
-            Spacer(modifier = Modifier.height(32.dp))
+                    }
+                }
+            }
 
             Text(
                 text = "Ready to Build Real Apps? Let's Talk.",
@@ -297,11 +318,12 @@ fun ContactForm(modifier: Modifier = Modifier) {
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Thanks for reaching out! 🚀",
+                                text = "Thanks for reaching out!",
                                 color = TextWhite,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                            Spacer(modifier=Modifier.height(16.dp))
                             Text(
                                 text = "We have received your query. A member of the Humble Coders team will review it and get back to you shortly.",
                                 color = TextLightGray,

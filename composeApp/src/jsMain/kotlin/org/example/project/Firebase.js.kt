@@ -1,78 +1,92 @@
 package org.example.project
 
-import kotlinx.coroutines.await
-import kotlinx.browser.window
-import org.w3c.fetch.Response
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 actual suspend fun submitToFirebase(fields: Map<String, String>, databaseUrl: String) {
-    println("=== Starting Firebase Submission ===")
-    println("URL: $databaseUrl")
-    
-    // Get current timestamp
-    val timestamp = js("Date.now()").unsafeCast<Number>()
-    val submittedAt = js("new Date().toISOString()") as String
-    
-    // Build Firestore document structure
-    val firestoreFields = buildString {
-        append("{")
-        var isFirst = true
-        fields.forEach { (key, value) ->
-            if (!isFirst) append(",")
-            append("\"$key\": {\"stringValue\": \"${escapeJsonString(value)}\"}")
-            isFirst = false
+    console.log("=== Starting Firebase Submission ===")
+    console.log("URL:", databaseUrl)
+
+    val timestamp = js("Date.now()").toString()
+    val now = js("new Date().toISOString()").toString()
+
+    // Build JSON string manually
+    val jsonBody = buildString {
+        append("""{"fields":{""")
+
+        fields.entries.forEachIndexed { index, (key, value) ->
+            if (index > 0) append(",")
+            append(""""$key":{"stringValue":"${escapeJsonString(value)}"}""")
         }
-        // Add timestamp as integerValue
-        if (!isFirst) append(",")
-        append("\"timestamp\": {\"integerValue\": \"$timestamp\"}")
-        // Add submittedAt as stringValue
-        append(",\"submittedAt\": {\"stringValue\": \"${escapeJsonString(submittedAt)}\"}")
-        append("}")
+
+        append(""","timestamp":{"integerValue":"$timestamp"}""")
+        append(""","submittedAt":{"stringValue":"$now"}""")
+        append("}}")
     }
-    
-    val firestoreDocument = """
-    {
-        "fields": $firestoreFields
-    }
-    """.trimIndent()
-    
-    println("Request body: $firestoreDocument")
-    
-    // Create fetch options
-    val fetchOptions = js("{}")
-    fetchOptions.method = "POST"
-    fetchOptions.headers = js("{}")
-    fetchOptions.headers["Content-Type"] = "application/json"
-    fetchOptions.body = firestoreDocument
-    
-    try {
-        println("Sending request...")
-        
-        val response = window.fetch(databaseUrl, fetchOptions).await() as Response
-        
-        println("Response received, status: ${response.status}")
-        
-        // Get response text
-        val responseText = response.text().await()
-        println("Response body: $responseText")
-        
-        val status = response.status.toInt()
-        
-        if (status !in 200..299) {
-            println("HTTP Error: $status $responseText")
-            throw Exception("Failed to submit: HTTP $status - $responseText")
+
+    console.log("Request body:", jsonBody)
+    console.log("Sending request via XMLHttpRequest...")
+
+    return suspendCancellableCoroutine { continuation ->
+        try {
+            // Use XMLHttpRequest instead of fetch to avoid Kotlin/Wasm interop issues
+            val xhr = js("new XMLHttpRequest()")
+
+            // Set up timeout
+            xhr.timeout = 15000
+
+            // Handle successful response
+            js("""
+                xhr.onload = function() {
+                    console.log("Response status:", xhr.status);
+                    console.log("Response text:", xhr.responseText);
+                    
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        console.log("=== Submission Successful ===");
+                        continuation.resume(null);
+                    } else {
+                        console.error("HTTP Error:", xhr.status, xhr.responseText);
+                        continuation.resumeWithException(
+                            new Error("Failed to submit: HTTP " + xhr.status + " - " + xhr.responseText)
+                        );
+                    }
+                };
+            """)
+
+            // Handle network errors
+            js("""
+                xhr.onerror = function() {
+                    console.error("=== Network Error ===");
+                    continuation.resumeWithException(new Error("Network error occurred"));
+                };
+            """)
+
+            // Handle timeout
+            js("""
+                xhr.ontimeout = function() {
+                    console.error("=== Request Timeout ===");
+                    continuation.resumeWithException(new Error("Request timeout after 15 seconds"));
+                };
+            """)
+
+            // Open and send the request
+            js("""
+                xhr.open('POST', databaseUrl, true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.send(jsonBody);
+            """)
+
+            console.log("Request sent!")
+
+        } catch (e: Exception) {
+            console.error("=== Exception in setup ===")
+            console.error("Error:", e.message)
+            continuation.resumeWithException(Exception("Failed to send request: ${e.message}"))
         }
-        
-        println("=== Submission Successful ===")
-        
-    } catch (e: Exception) {
-        println("=== Submission Failed ===")
-        println("Error message: ${e.message}")
-        println("Error: $e")
-        throw Exception("Network error: ${e.message ?: "Unknown error"}")
     }
 }
 
-// Helper function to escape JSON strings for Firestore
 private fun escapeJsonString(str: String): String {
     return str
         .replace("\\", "\\\\")

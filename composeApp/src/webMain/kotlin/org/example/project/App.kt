@@ -116,6 +116,8 @@ import kotlinproject.composeapp.generated.resources.android
 import kotlinproject.composeapp.generated.resources.compose_multiplatform
 import kotlinproject.composeapp.generated.resources.humble
 import kotlinproject.composeapp.generated.resources.ic_android
+import kotlinproject.composeapp.generated.resources.instagram
+import kotlinproject.composeapp.generated.resources.linkedin
 import kotlinproject.composeapp.generated.resources.logo1
 import kotlinproject.composeapp.generated.resources.logo2
 import kotlinproject.composeapp.generated.resources.logo3
@@ -2173,6 +2175,9 @@ private fun MentorDetails() {
 fun PricingSection(sectionPositions: MutableMap<String, Int> = mutableMapOf()) {
     val responsive = LocalResponsiveConfig.current
     val isMobile = responsive.isMobile
+    val uriHandler = LocalUriHandler.current
+    val routing = LocalWebRouting.current
+    
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -2234,7 +2239,8 @@ fun PricingSection(sectionPositions: MutableMap<String, Int> = mutableMapOf()) {
                             "Basic Q&A Support",
                             "Certificate of Completion"
                         ),
-                        isPopular = false
+                        isPopular = false,
+                        onUdemyClick = { uriHandler.openUri(UDEMY_COURSE_URL) }
                     )
                     PricingCard(
                         title = "Hybrid Live Bootcamp",
@@ -2247,7 +2253,8 @@ fun PricingSection(sectionPositions: MutableMap<String, Int> = mutableMapOf()) {
                             "Capstone Project Guidance",
                             "Internship Assistance"
                         ),
-                        isPopular = true
+                        isPopular = true,
+                        onContactClick = { routing.navigateTo("contact") }
                     )
                 }
             } else {
@@ -2267,7 +2274,8 @@ fun PricingSection(sectionPositions: MutableMap<String, Int> = mutableMapOf()) {
                             "Certificate of Completion"
                         ),
                         isPopular = false,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onUdemyClick = { uriHandler.openUri(UDEMY_COURSE_URL) }
                     )
                     PricingCard(
                         title = "Hybrid Live Bootcamp",
@@ -2281,7 +2289,8 @@ fun PricingSection(sectionPositions: MutableMap<String, Int> = mutableMapOf()) {
                             "Internship Assistance"
                         ),
                         isPopular = true,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onContactClick = { routing.navigateTo("contact") }
                     )
                 }
             }
@@ -2289,6 +2298,7 @@ fun PricingSection(sectionPositions: MutableMap<String, Int> = mutableMapOf()) {
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PricingCard(
     title: String,
@@ -2296,75 +2306,127 @@ fun PricingCard(
     price: String,
     features: List<String>,
     isPopular: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onUdemyClick: (() -> Unit)? = null,
+    onContactClick: (() -> Unit)? = null
 ) {
     val responsive = LocalResponsiveConfig.current
+    var isHovered by remember { mutableStateOf(false) }
+    val overlayAlpha by animateFloatAsState(
+        targetValue = if (isHovered) 1f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "overlayAlpha"
+    )
+    
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+            .onPointerEvent(PointerEventType.Exit) { isHovered = false },
         colors = CardDefaults.cardColors(
             containerColor = if (isPopular) BlueAccent else Color(0xFF13131A)
         ),
         shape = RoundedCornerShape(16.dp)
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(if (responsive.isMobile) 24.dp else 36.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(if (responsive.isMobile) 24.dp else 36.dp)
             ) {
-                if (isPopular) {
-                    Surface(
-                        color = Color(0xFFFFD700),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Text(
-                            text = "Recommended",
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            color = Color(0xFF0A0A0F),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = TextWhite,
-                    fontSize = if (responsive.isMobile) 22.sp else 26.sp,
-                    lineHeight = 34.sp
-                )
-                Text(
-                    text = description,
-                    color = if (isPopular) TextWhite.copy(alpha = 0.9f) else TextGray,
-                    fontSize = responsive.bodyTextSize,
-                    lineHeight = 24.sp
-                )
-                Text(
-                    text = price,
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = TextWhite,
-                    fontSize = if (responsive.isMobile) 34.sp else 42.sp
-                )
-
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    features.forEach { feature ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.Top
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    if (isPopular) {
+                        Surface(
+                            color = Color(0xFFFFD700),
+                            shape = RoundedCornerShape(20.dp)
                         ) {
-                            Icon(Icons.Filled.Check, contentDescription = null, tint = TextWhite, modifier = Modifier.size(20.dp))
                             Text(
-                                text = feature,
-                                color = if (isPopular) TextWhite.copy(alpha = 0.95f) else TextWhite,
-                                fontSize = responsive.bodyTextSize,
-                                lineHeight = 24.sp
+                                text = "Recommended",
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                color = Color(0xFF0A0A0F),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
+                    }
+
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = TextWhite,
+                        fontSize = if (responsive.isMobile) 22.sp else 26.sp,
+                        lineHeight = 34.sp
+                    )
+                    Text(
+                        text = description,
+                        color = if (isPopular) TextWhite.copy(alpha = 0.9f) else TextGray,
+                        fontSize = responsive.bodyTextSize,
+                        lineHeight = 24.sp
+                    )
+                    Text(
+                        text = price,
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextWhite,
+                        fontSize = if (responsive.isMobile) 34.sp else 42.sp
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        features.forEach { feature ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Icon(Icons.Filled.Check, contentDescription = null, tint = TextWhite, modifier = Modifier.size(20.dp))
+                                Text(
+                                    text = feature,
+                                    color = if (isPopular) TextWhite.copy(alpha = 0.95f) else TextWhite,
+                                    fontSize = responsive.bodyTextSize,
+                                    lineHeight = 24.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Hover overlay with action button - covers entire card
+            val hasAction = onUdemyClick != null || onContactClick != null
+            if (hasAction && overlayAlpha > 0f) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .alpha(overlayAlpha)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Color.Black.copy(alpha = 0.7f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Button(
+                        onClick = {
+                            onUdemyClick?.invoke() ?: onContactClick?.invoke()
+                        },
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .let { if (responsive.isMobile) it.fillMaxWidth(0.8f) else it.widthIn(max = 200.dp) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = BlueAccent
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = if (onUdemyClick != null) "View on Udemy" else "Contact Us",
+                            color = TextWhite,
+                            fontSize = responsive.bodyTextSize,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
                     }
                 }
             }
@@ -2540,6 +2602,7 @@ fun FAQItem(question: String, answer: String, expanded: Boolean, onExpandedChang
 fun FinalCTASection() {
     val responsive = LocalResponsiveConfig.current
     val isMobile = responsive.isMobile
+    val routing = LocalWebRouting.current
     val uriHandler = LocalUriHandler.current
     Box(
         modifier = Modifier
@@ -2568,7 +2631,7 @@ fun FinalCTASection() {
             )
 
             Button(
-                onClick = { uriHandler.openUri(UDEMY_COURSE_URL) },
+                onClick = { routing.navigateTo("contact") },
                 modifier = Modifier
                     .height(responsive.buttonHeight)
                     .let { if (isMobile) it.fillMaxWidth() else it },
@@ -2578,7 +2641,7 @@ fun FinalCTASection() {
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    "Enroll Now",
+                    "Join Us",
                     color = TextWhite,
                     fontSize = responsive.bodyTextSize,
                     fontWeight = FontWeight.Medium,
@@ -2989,14 +3052,26 @@ private fun FooterBottomRow() {
 
 @Composable
 fun SocialIcon(icon: String) {
+    val uriHandler = LocalUriHandler.current
+    val (iconResource, link) = when (icon) {
+        "IG" -> Res.drawable.instagram to "https://www.instagram.com/humble_coders?igsh=d2EyOG52dmpkcmVq"
+        "IN" -> Res.drawable.linkedin to "https://www.linkedin.com/company/humble-coders"
+        else -> return
+    }
+    
     Box(
         modifier = Modifier
             .size(44.dp)
             .clip(CircleShape)
             .background(Color(0xFF1E1E28))
-            .clickable { },
+            .clickable { uriHandler.openUri(link) },
         contentAlignment = Alignment.Center
     ) {
-        Text(icon, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Image(
+            painter = painterResource(iconResource),
+            contentDescription = if (icon == "IG") "Instagram" else "LinkedIn",
+            modifier = Modifier.size(24.dp),
+            contentScale = ContentScale.Fit
+        )
     }
 }
