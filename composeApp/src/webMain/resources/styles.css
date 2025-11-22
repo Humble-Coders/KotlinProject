@@ -1,0 +1,14 @@
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    font-family: "Noto Sans Symbols", "Noto Color Emoji", "Noto Emoji", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+}
+
+/* Ensure canvas renders with proper fonts */
+canvas {
+    font-family: "Noto Sans Symbols", "Noto Color Emoji", "Noto Emoji", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
