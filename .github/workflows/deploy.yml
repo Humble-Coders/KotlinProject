@@ -37,13 +37,38 @@ jobs:
       - name: Build KMP Web App
         run: ./gradlew :composeApp:wasmJsBrowserProductionWebpack --no-daemon
       
+      - name: Prepare deployment directory
+        id: prepare
+        run: |
+          # Check for standard output location
+          if [ -d "composeApp/build/dist/wasmJs/productionExecutable" ]; then
+            echo "output_path=composeApp/build/dist/wasmJs/productionExecutable" >> $GITHUB_OUTPUT
+            echo "✓ Using standard output path"
+          # Check for alternative location in build/wasm
+          elif [ -d "build/wasm/packages/KotlinProject-composeApp/kotlin" ]; then
+            # Create dist structure and copy files
+            mkdir -p composeApp/build/dist/wasmJs/productionExecutable
+            cp -r build/wasm/packages/KotlinProject-composeApp/kotlin/* composeApp/build/dist/wasmJs/productionExecutable/
+            echo "output_path=composeApp/build/dist/wasmJs/productionExecutable" >> $GITHUB_OUTPUT
+            echo "✓ Copied files from alternative location"
+          else
+            echo "✗ Could not find build output"
+            echo "Searching for HTML and WASM files..."
+            find . -name "index.html" -type f 2>/dev/null | head -3
+            find . -name "*.wasm" -type f 2>/dev/null | head -3
+            exit 1
+          fi
+          
+          echo "Contents of output directory:"
+          ls -la "${{ steps.prepare.outputs.output_path }}" || true
+      
       - name: Setup Pages
         uses: actions/configure-pages@v4
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './composeApp/build/dist/wasmJs/productionExecutable'
+          path: '${{ steps.prepare.outputs.output_path }}'
       
       - name: Deploy to GitHub Pages
         id: deployment
